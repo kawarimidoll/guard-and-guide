@@ -21,3 +21,7 @@ target
 #.idea/
 
 /target
+
+# Nix
+/result
+.pre-commit-config.yaml
