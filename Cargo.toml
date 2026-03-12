@@ -1,0 +1,23 @@
+[package]
+name = "guard-and-guide"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["kawarimidoll"]
+description = "Guard coding agents from dangerous operations, guide to safer alternatives"
+license = "MIT"
+repository = "https://github.com/kawarimidoll/guard-and-guide"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+enum_glob_use = "deny"
+mod_module_files = "deny"
