@@ -1,0 +1,11 @@
+version = 1
+
+[[rules]]
+matcher = "File"
+regex = '\.env'
+message = "Access to .env files is prohibited."
+
+[[rules]]
+matcher = "Bash"
+regex = '\bsed\b'
+message = "Use of 'sed' is prohibited. Use 'perl' instead."
