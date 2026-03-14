@@ -1,0 +1,196 @@
+name: Publish
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  check:
+    name: Check for new commits
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      has_commits: ${{ steps.check.outputs.has_commits }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check for new commits since last release
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LAST_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName // empty')
+          if [ -z "$LAST_TAG" ] || [ "$(git rev-list "${LAST_TAG}..HEAD" --count)" -gt 0 ]; then
+            echo "has_commits=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No new commits since $LAST_TAG, skipping release"
+          fi
+
+  prepare:
+    name: Prepare release
+    needs: check
+    if: needs.check.outputs.has_commits == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push version commit
+    outputs:
+      tag: ${{ steps.tag.outputs.TAG }}
+      sha: ${{ steps.version.outputs.SHA }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Generate calver tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DATE=$(date -u +%y.%-m.%-d)
+          COUNT=$(gh release list --json tagName --jq "[.[] | select(.tagName | startswith(\"${DATE}\"))] | length")
+          if [ "$COUNT" -eq 0 ]; then
+            TAG="$DATE"
+          else
+            TAG="${DATE}-${COUNT}"
+          fi
+          echo "TAG=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Generated tag: $TAG"
+
+      - name: Update Cargo.toml version
+        id: version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.TAG }}
+        run: |
+          sed -i '0,/^version = ".*"/{s/^version = ".*"/version = "'"$TAG"'"/}' Cargo.toml
+          sed -i '/^name = "guard-and-guide"/{n;s/^version = ".*"/version = "'"$TAG"'"/}' Cargo.lock
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          gh auth setup-git
+          git add Cargo.toml Cargo.lock
+          git commit -m "chore(release): $TAG"
+          git push
+          echo "SHA=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build-linux:
+    name: Build Linux (${{ matrix.target }})
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            asset_name: linux-amd64
+          - target: aarch64-unknown-linux-gnu
+            asset_name: linux-arm64
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+      - uses: Swatinem/rust-cache@401aff9a7a08acb9d27b64936a90db81024cff97 # v2.8.2
+        with:
+          key: ${{ matrix.target }}
+      - uses: taiki-e/setup-cross-toolchain-action@b8d1a322a6009a2b7220f53996695778eef89b41 # v1
+        with:
+          target: ${{ matrix.target }}
+      - name: Build
+        run: cargo build --release --target "$BUILD_TARGET"
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        with:
+          name: ${{ matrix.asset_name }}
+          path: target/${{ matrix.target }}/release/guard-and-guide
+
+  build-macos:
+    name: Build macOS (${{ matrix.target }})
+    needs: prepare
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            asset_name: darwin-amd64
+          - target: aarch64-apple-darwin
+            asset_name: darwin-arm64
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@401aff9a7a08acb9d27b64936a90db81024cff97 # v2.8.2
+        with:
+          key: ${{ matrix.target }}
+      - name: Build
+        run: cargo build --release --target "$BUILD_TARGET"
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        with:
+          name: ${{ matrix.asset_name }}
+          path: target/${{ matrix.target }}/release/guard-and-guide
+
+  release:
+    name: Create GitHub Release
+    needs: [prepare, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create release and upload assets
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Generate changelog
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: .github/scripts/generate-changelog.sh "" "$TAG" > changelog.md
+
+      - uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8
+        with:
+          path: artifacts
+
+      - name: Prepare binaries
+        run: |
+          mkdir dist
+          for dir in artifacts/*/; do
+            name=$(basename "$dir")
+            mv "$dir/guard-and-guide" "dist/$name"
+          done
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file changelog.md \
+            --latest \
+            dist/linux-amd64 \
+            dist/linux-arm64 \
+            dist/darwin-amd64 \
+            dist/darwin-arm64
