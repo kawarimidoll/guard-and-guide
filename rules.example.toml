@@ -1,6 +1,6 @@
 version = 1
 
-# --- File access rules (Read, Write, Edit) ---
+# --- File access rules ("File" is an alias for "Read|Write|Edit") ---
 
 [[rules]]
 matcher = "File"
@@ -32,7 +32,24 @@ matcher = "File"
 regex = 'secrets|token'
 message = "Access to files containing secrets/tokens is prohibited. Ask the user to provide the values you need."
 
+# --- Readonly file rules (Write|Edit) ---
+
+[[rules]]
+matcher = "Write|Edit"
+regex = 'Makefile$'
+message = "Makefile is read-only. Ask the user to modify it."
+
+[[rules]]
+matcher = "Write|Edit"
+regex = '\.lock$'
+message = "Lock files are read-only. Do not modify them directly."
+
 # --- Bash command rules ---
+
+[[rules]]
+matcher = "Bash"
+regex = '(/usr)?/(s?bin|local/bin)/'
+message = "Do not use absolute paths to system binaries. Use the command name directly."
 
 [[rules]]
 matcher = "Bash"
@@ -47,12 +64,12 @@ message = "Use of 'sed' is prohibited. Use 'perl' instead. Example: perl -pi -e 
 [[rules]]
 matcher = "Bash"
 regex = '\bgit\s+push\b'
-message = "Do not execute 'git push'. Please ask the user to execute it."
+message = "Use of 'git push' is prohibited. Ask the user to execute it."
 
 [[rules]]
 matcher = "Bash"
 regex = '\bgit\s+add\s+(-A|--all|\.($|[ ;|&]))'
-message = "Do not git-add all files. Specify the file name(s) to add."
+message = "Do not git-add all files. Specify the files to add."
 
 [[rules]]
 matcher = "Bash"
@@ -77,7 +94,7 @@ message = "Use of 'git stash drop/clear' is prohibited. Ask the user to execute 
 [[rules]]
 matcher = "Bash"
 regex = '\b(env|printenv|export)\b'
-message = "Accessing environment variables is prohibited. Ask the user to check or set environment variables on your behalf."
+message = "Accessing environment variables is prohibited. Ask the user to check or set environment variables."
 
 [[rules]]
 matcher = "Bash"
