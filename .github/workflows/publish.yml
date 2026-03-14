@@ -77,6 +77,8 @@ jobs:
           TAG: ${{ needs.check.outputs.tag }}
         run: perl -pi -e 's/^version = ".*"/version = "'"$TAG"'"/ && $done++ unless $done' Cargo.toml
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+        with:
+          toolchain: stable
       - uses: Swatinem/rust-cache@401aff9a7a08acb9d27b64936a90db81024cff97 # v2.8.2
         with:
           key: ${{ matrix.target }}
@@ -116,6 +118,7 @@ jobs:
         run: perl -pi -e 's/^version = ".*"/version = "'"$TAG"'"/ && $done++ unless $done' Cargo.toml
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
         with:
+          toolchain: stable
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@401aff9a7a08acb9d27b64936a90db81024cff97 # v2.8.2
         with:
