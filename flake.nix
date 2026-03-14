@@ -36,6 +36,7 @@
             pname = cargoToml.package.name;
             version = cargoToml.package.version;
             src = ./.;
+            env.GIT_HASH = self.shortRev or "dirty";
             cargoLock = {
               lockFile = ./Cargo.lock;
             };
