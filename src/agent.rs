@@ -4,6 +4,7 @@ use clap::ValueEnum;
 pub enum Agent {
     ClaudeCode,
     GeminiCli,
+    #[clap(hide = true)]
     CopilotCli,
 }
 
