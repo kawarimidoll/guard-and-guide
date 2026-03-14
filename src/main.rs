@@ -4,7 +4,7 @@ pub mod evaluator;
 pub mod input;
 pub mod output;
 
-use std::io::Read;
+use std::io::{self, IsTerminal, Read};
 use std::path::PathBuf;
 use std::process;
 
@@ -50,11 +50,16 @@ fn expand_tilde(path: &str) -> PathBuf {
 
 fn run() -> Result<(), String> {
     let cli = Cli::parse();
+
+    if io::stdin().is_terminal() {
+        return Err("this tool is designed to be used as an agent hook, not invoked directly.\nSee --help for usage.".to_string());
+    }
+
     let config_path = expand_tilde(&cli.config);
     let config = config::load(&config_path)?;
 
     let mut stdin_buf = String::new();
-    std::io::stdin()
+    io::stdin()
         .read_to_string(&mut stdin_buf)
         .map_err(|e| format!("failed to read stdin: {e}"))?;
 
