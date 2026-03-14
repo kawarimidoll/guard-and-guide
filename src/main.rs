@@ -12,8 +12,18 @@ use clap::Parser;
 
 use agent::Agent;
 
+fn version() -> &'static str {
+    let v = env!("CARGO_PKG_VERSION");
+    let hash = env!("GIT_HASH");
+    if v == "0.0.0" && !hash.is_empty() {
+        hash
+    } else {
+        v
+    }
+}
+
 #[derive(Parser)]
-#[command(version, about)]
+#[command(version = version(), about)]
 struct Cli {
     /// Agent type for input/output format
     #[arg(
