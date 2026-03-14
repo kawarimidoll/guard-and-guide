@@ -19,6 +19,7 @@ jobs:
       contents: read
     outputs:
       has_commits: ${{ steps.check.outputs.has_commits }}
+      tag: ${{ steps.tag.outputs.TAG }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -37,23 +38,8 @@ jobs:
             echo "No new commits since $LAST_TAG, skipping release"
           fi
 
-  prepare:
-    name: Prepare release
-    needs: check
-    if: needs.check.outputs.has_commits == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write # push version commit
-    outputs:
-      tag: ${{ steps.tag.outputs.TAG }}
-      sha: ${{ steps.version.outputs.SHA }}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
       - name: Generate calver tag
+        if: steps.check.outputs.has_commits == 'true'
         id: tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -68,25 +54,10 @@ jobs:
           echo "TAG=$TAG" >> "$GITHUB_OUTPUT"
           echo "Generated tag: $TAG"
 
-      - name: Update Cargo.toml version
-        id: version
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.tag.outputs.TAG }}
-        run: |
-          sed -i '0,/^version = ".*"/{s/^version = ".*"/version = "'"$TAG"'"/}' Cargo.toml
-          sed -i '/^name = "guard-and-guide"/{n;s/^version = ".*"/version = "'"$TAG"'"/}' Cargo.lock
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          gh auth setup-git
-          git add Cargo.toml Cargo.lock
-          git commit -m "chore(release): $TAG"
-          git push
-          echo "SHA=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
   build-linux:
     name: Build Linux (${{ matrix.target }})
-    needs: prepare
+    needs: check
+    if: needs.check.outputs.has_commits == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -100,8 +71,11 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          ref: ${{ needs.prepare.outputs.sha }}
           persist-credentials: false
+      - name: Set version
+        env:
+          TAG: ${{ needs.check.outputs.tag }}
+        run: perl -pi -e 's/^version = ".*"/version = "'"$TAG"'"/ && $done++ unless $done' Cargo.toml
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
       - uses: Swatinem/rust-cache@401aff9a7a08acb9d27b64936a90db81024cff97 # v2.8.2
         with:
@@ -120,7 +94,8 @@ jobs:
 
   build-macos:
     name: Build macOS (${{ matrix.target }})
-    needs: prepare
+    needs: check
+    if: needs.check.outputs.has_commits == 'true'
     runs-on: macos-latest
     permissions:
       contents: read
@@ -134,8 +109,11 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          ref: ${{ needs.prepare.outputs.sha }}
           persist-credentials: false
+      - name: Set version
+        env:
+          TAG: ${{ needs.check.outputs.tag }}
+        run: perl -pi -e 's/^version = ".*"/version = "'"$TAG"'"/ && $done++ unless $done' Cargo.toml
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
         with:
           targets: ${{ matrix.target }}
@@ -153,20 +131,19 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [prepare, build-linux, build-macos]
+    needs: [check, build-linux, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write # create release and upload assets
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          ref: ${{ needs.prepare.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
 
       - name: Generate changelog
         env:
-          TAG: ${{ needs.prepare.outputs.tag }}
+          TAG: ${{ needs.check.outputs.tag }}
         run: .github/scripts/generate-changelog.sh "" "$TAG" > changelog.md
 
       - uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8
@@ -184,7 +161,7 @@ jobs:
       - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.prepare.outputs.tag }}
+          TAG: ${{ needs.check.outputs.tag }}
         run: |
           gh release create "$TAG" \
             --title "$TAG" \
