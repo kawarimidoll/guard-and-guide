@@ -4,8 +4,10 @@
 
 [![CI](https://github.com/kawarimidoll/guard-and-guide/actions/workflows/ci.yml/badge.svg)](https://github.com/kawarimidoll/guard-and-guide/actions/workflows/ci.yml)
 [![Latest version](https://img.shields.io/github/v/release/kawarimidoll/guard-and-guide)](https://github.com/kawarimidoll/guard-and-guide/releases/latest)
-[![Claude Code](https://img.shields.io/badge/Claude_Code-black?logo=anthropic)](https://docs.anthropic.com/en/docs/claude-code)
-[![Gemini CLI](https://img.shields.io/badge/Gemini_CLI-black?logo=googlegemini)](https://github.com/google-gemini/gemini-cli)
+[![Claude Code](https://img.shields.io/badge/Claude_Code-D97757?logo=claude&logoColor=white)](https://docs.anthropic.com/en/docs/claude-code)
+[![Gemini CLI](https://img.shields.io/badge/Gemini_CLI-8E75B2?logo=google%20gemini&logoColor=white)](https://github.com/google-gemini/gemini-cli)
+[![Rust](https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Nix](https://img.shields.io/badge/Nix-5277C3?logo=nixos&logoColor=white)](https://nixos.org/)
 
 🛡️ Guard coding agents from dangerous operations, and 🧭 Guide them to safer alternatives.
 
