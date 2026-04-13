@@ -25,7 +25,7 @@ jobs:
           toolchain: stable
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
-      - uses: taiki-e/install-action@921a4027af787cda265c4f334a0f7f89b21d72e9 # v2
+      - uses: taiki-e/install-action@d0f23220b09a75c6db730f13bb37c4f8144b4382 # v2
         with:
           tool: just
       - run: just ci
