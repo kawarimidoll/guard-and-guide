@@ -24,7 +24,9 @@ pub fn evaluate(agent: Agent, rules: &[Rule], input: &HookInput) -> Option<EvalR
 
         let value = input.tool_input.get(agent_field).and_then(|v| v.as_str())?;
 
-        let re = Regex::new(&rule.regex).ok()?;
+        let Ok(re) = Regex::new(&rule.regex) else {
+            continue;
+        };
         if re.is_match(value) {
             return Some(EvalResult {
                 message: rule.message.clone(),
@@ -125,5 +127,18 @@ mod tests {
         let rules = vec![make_rule("Bash", r"\.env", "blocked")];
         let input = make_input("Read", json!({"file_path": ".env"}));
         assert!(evaluate(Agent::ClaudeCode, &rules, &input).is_none());
+    }
+
+    #[test]
+    fn invalid_regex_rule_does_not_block_subsequent_rules() {
+        // The `regex` crate doesn't support lookahead, so this rule fails to
+        // compile. It must not prevent the next (valid) rule from matching.
+        let rules = vec![
+            make_rule("Bash", r"\bgit\s+stash\b(?!\s+(list|show)\b)", "unused"),
+            make_rule("Bash", r"\brm\s+-rf\b", "blocked rm -rf"),
+        ];
+        let input = make_input("Bash", json!({"command": "rm -rf /tmp/x"}));
+        let result = evaluate(Agent::ClaudeCode, &rules, &input).unwrap();
+        assert_eq!(result.message, "blocked rm -rf");
     }
 }
